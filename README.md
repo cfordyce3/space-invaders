@@ -4,11 +4,12 @@
 - [ ] Player character
     - [x] Left and right movement
     - [x] Ship sprite
+        - [ ] Sprite effects on jets
     - [x] Bounding on X-axis
     - [ ] Lives
 - [ ] Player cover spots
     - [ ] Health / damage system from projectiles
-- [ ] Black screen with stars (white pixels) "randomly" placed at top that fall / fade to bottom
+- [x] Black screen with stars (white pixels) "randomly" placed at top that fall / fade to bottom
 - [ ] Enemies
     - [ ] Grid (?) style
     - [ ] Alien sprite

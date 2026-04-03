@@ -6,10 +6,13 @@ import "core:math/rand"
 import "core:thread"
 import "core:time"
 
+TARGET_FPS   :: 60
 SCREEN_SIZE  :: 600
 PLAYER_SPEED :: 200
+NUM_STARS    :: 48
 
 deltaSpeed: f32
+starCount: u8
 
 Player :: struct {
   texture: rl.Texture2D,
@@ -17,21 +20,30 @@ Player :: struct {
   lives: i8,
 }
 
-reset :: proc(player: ^Player) {
+Star :: struct {
+  x: f32,
+  y: f32,
+  alpha: u8,
+}
+
+update_star :: proc(star: ^Star) {
+  if star.alpha == 16 || star.y > SCREEN_SIZE {
+    star.x = f32(rand.uint_max(SCREEN_SIZE - 20))
+    star.y = f32(-4)
+    star.alpha = u8(rand.uint_range(16, 254))
+  }
+
+  star.y += 2
+  if starCount % 2 == 0 do star.alpha -= 1
+
+  if starCount == 16 {
+    starCount = 1
+  }
+}
+
+reset_game :: proc(player: ^Player) {
   player.x = f32(SCREEN_SIZE/2 - player.texture.width/2)
   player.lives = 3
-}
-
-get_star_x :: proc() -> uint {
-  return rand.uint_max(SCREEN_SIZE - 20)
-}
-
-// Draw a random star
-// ONLY to be called post BeginDrawing()
-draw_stars :: proc() {
-  star_x := get_star_x()
-  fmt.println(star_x)
-  rl.DrawRectangle(i32(star_x), 10, 20, 20, rl.WHITE)
 }
 
 main :: proc() {
@@ -40,7 +52,7 @@ main :: proc() {
   defer rl.CloseWindow()
 
   // FPS Target
-  rl.SetTargetFPS(240)
+  rl.SetTargetFPS(TARGET_FPS)
 
   // Custom Exit Key (CAPS LOCK)
   rl.SetExitKey(rl.KeyboardKey.CAPS_LOCK)
@@ -57,18 +69,28 @@ main :: proc() {
     lives = 3,
   }
 
-  // Threading
-  thread.create()
+  // Stars init
+  stars: [NUM_STARS]Star 
+  for &star in stars {
+    star.x = f32(rand.uint_max(SCREEN_SIZE - 20))
+    star.y = f32(rand.uint_range(0, SCREEN_SIZE))
+    star.alpha = u8(rand.uint_range(16, 254))
+  }
+  starCount = 1
+
+
 
   // Game Loop
   for !rl.WindowShouldClose() {
+    //
     // Logic
+    //
 
     // Frametime player speed
     deltaSpeed = PLAYER_SPEED * rl.GetFrameTime()
 
     if rl.IsKeyPressed(rl.KeyboardKey.R) {
-      reset(&player)
+      reset_game(&player)
     }
 
 
@@ -83,14 +105,25 @@ main :: proc() {
 
 
 
+    //
     // Drawing
+    //
     rl.BeginDrawing()
     defer rl.EndDrawing()
 
+    // Black background
     rl.ClearBackground(rl.BLACK)
 
+    // Draw stars
+    for &star, index in stars {
+      // fmt.println(star, index)
+      rl.DrawRectangle(i32(star.x), i32(star.y), 2, 5, rl.Color{255, 255, 255, star.alpha}) 
+      update_star(&star)
+    }
+    starCount += 1
+
+    // Draw player
     rl.DrawTexture(player_texture, i32(player.x), i32(SCREEN_SIZE - SCREEN_SIZE/6), rl.WHITE)
 
-    draw_stars()
   }
 }
