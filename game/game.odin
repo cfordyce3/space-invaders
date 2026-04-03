@@ -6,10 +6,10 @@ import "core:math/rand"
 import "core:thread"
 import "core:time"
 
-TARGET_FPS   :: 60
+TARGET_FPS   :: 240
 SCREEN_SIZE  :: 600
 PLAYER_SPEED :: 200
-NUM_STARS    :: 48
+NUM_STARS    :: 60
 
 deltaSpeed: f32
 starCount: u8
@@ -30,13 +30,13 @@ update_star :: proc(star: ^Star) {
   if star.alpha == 16 || star.y > SCREEN_SIZE {
     star.x = f32(rand.uint_max(SCREEN_SIZE - 20))
     star.y = f32(-4)
-    star.alpha = u8(rand.uint_range(16, 254))
+    star.alpha = u8(rand.uint_range(16, 200))
   }
 
-  star.y += 2
-  if starCount % 2 == 0 do star.alpha -= 1
+  star.y += deltaSpeed * 4/8
+  if starCount % 16 == 0 do star.alpha -= 1
 
-  if starCount == 16 {
+  if starCount == 64 {
     starCount = 1
   }
 }
@@ -74,7 +74,7 @@ main :: proc() {
   for &star in stars {
     star.x = f32(rand.uint_max(SCREEN_SIZE - 20))
     star.y = f32(rand.uint_range(0, SCREEN_SIZE))
-    star.alpha = u8(rand.uint_range(16, 254))
+    star.alpha = u8(rand.uint_range(16, 200))
   }
   starCount = 1
 
