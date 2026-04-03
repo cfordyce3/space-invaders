@@ -58,7 +58,7 @@ main :: proc() {
   }
 
   // Threading
-
+  thread.create()
 
   // Game Loop
   for !rl.WindowShouldClose() {
