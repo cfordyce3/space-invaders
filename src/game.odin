@@ -22,8 +22,18 @@ globalCount: u8
 centerTop: rl.Vector2 = {SCREEN_SIZE / 2, 0}
 centerBot: rl.Vector2 = {SCREEN_SIZE / 2, SCREEN_SIZE}
 
+EnemyRow :: enum {
+  TOP    = 40,
+  TOPMID = 80,
+  BOTMID = 120,
+  BOT    = 160
+}
+
 // Dynamic array of player's spawned projectiles
 projectileList: [dynamic]Projectile
+
+// List of enemies
+enemyList: [24]Entity
 
 
 // Entity stuff
@@ -33,7 +43,6 @@ Entity :: struct {
   y: f32,
   health: u8,
 }
-
 
 // Projectile stuff
 Projectile :: struct {
@@ -52,18 +61,17 @@ spawn_projectile :: proc(proj: Projectile) -> rl.Rectangle {
   }
 }
 
-update_projectile :: proc(proj: ^Projectile, enemy: Entity) -> (remove: bool = false) {
-  if proj.y < 0 {
-    remove = true
-  }
+update_projectile :: proc(proj: ^Projectile, enemy: ^Entity) -> (remove: bool = false) {
+  if proj.y < 0 do remove = true // if at top of screen
 
   if rl.CheckCollisionRecs(get_bounding_box(proj), get_bounding_box(enemy)) {
     remove = true
+    enemy.health = 0
   }
 
   proj.y -= f32(proj.speed) * rl.GetFrameTime()
 
-  return // remove true|false
+  return // remove = true|false
 }
 
 
@@ -135,14 +143,14 @@ main :: proc() {
   // Player sprite
   player_sprite := rl.LoadImage("resources/player.png")
   player_texture := rl.LoadTextureFromImage(player_sprite)
-  defer rl.UnloadTexture(player_texture)
   rl.UnloadImage(player_sprite)
+  defer rl.UnloadTexture(player_texture)
 
   // Enemy1 sprite
   enemy1_sprite := rl.LoadImage("resources/enemy1.png")
   enemy1_texture := rl.LoadTextureFromImage(enemy1_sprite)
-  defer rl.UnloadTexture(enemy1_texture)
   rl.UnloadImage(enemy1_sprite)
+  defer rl.UnloadTexture(enemy1_texture)
 
 
   // Player init
@@ -157,7 +165,7 @@ main :: proc() {
   enemy1: Entity = { 
     texture = enemy1_texture,
     x = f32(SCREEN_SIZE/2 - enemy1_texture.width/2), 
-    y = f32(50 + enemy1_texture.height/2), 
+    y = f32(EnemyRow.TOP),
     health = 1,
   }
 
@@ -173,6 +181,7 @@ main :: proc() {
 
   shootingDelay := 0
 
+  //
   // Game Loop
   for !rl.WindowShouldClose() {
     //
@@ -188,14 +197,14 @@ main :: proc() {
 
 
 
-    // Player input
+    // Player movement
     if rl.IsKeyDown(rl.KeyboardKey.A) || rl.IsKeyDown(rl.KeyboardKey.LEFT) {
       if player.x - deltaPlayerSpeed > 0 do player.x -= deltaPlayerSpeed
     }
     if rl.IsKeyDown(rl.KeyboardKey.D) || rl.IsKeyDown(rl.KeyboardKey.RIGHT) {
       if player.x + f32(player.texture.width) + deltaPlayerSpeed < SCREEN_SIZE do player.x += deltaPlayerSpeed
     }
-
+    // Player shoot
     if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && shootingDelay == 0 {
       // fmt.println("[shoot here]")
       inject_at(&projectileList, 0, Projectile {
@@ -205,11 +214,9 @@ main :: proc() {
         speed = PROJECTILE_SPEED_PLAYER,
       })
       // fmt.println("# of projectiles:", len(projectileList))
-      shootingDelay = 50 
+      shootingDelay = 60 
     }
-    if shootingDelay != 0 { 
-      shootingDelay -= 1 
-    }
+    if shootingDelay != 0 do shootingDelay -= 1
 
 
     //
@@ -232,13 +239,16 @@ main :: proc() {
     rl.DrawTexture(player.texture, i32(player.x), i32(player.y), rl.WHITE)
 
     // Draw enemy
-    rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(enemy1.y), rl.WHITE)
+    if enemy1.health != 0 do rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(enemy1.y), rl.WHITE)
+    // rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(EnemyRow.TOPMID), rl.WHITE)
+    // rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(EnemyRow.BOTMID), rl.WHITE)
+    // rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(EnemyRow.BOT), rl.WHITE)
     // rl.DrawRectangleLinesEx(get_bounding_box(enemy1), 1, rl.BLUE)
 
     // Draw projectiles
     for &proj, index in projectileList {
       rl.DrawRectangle(i32(proj.x), i32(proj.y), PROJECTILE_WIDTH, PROJECTILE_HEIGHT, proj.color)
-      if update_projectile(&proj, enemy1) { 
+      if update_projectile(&proj, &enemy1) { 
         unordered_remove(&projectileList, index)
       // fmt.println("# of projectiles:", len(projectileList))
       }
