@@ -12,14 +12,14 @@
 - [x] Black screen with stars (white pixels) "randomly" placed at top that fall / fade to bottom
 - [ ] Enemies
     - [ ] Grid (?) style
-    - [ ] Alien sprite
+    - [x] Alien sprite
     - [ ] Different colors / types
     - [ ] Enemies get closer
 - [ ] Projectile
-    - [ ] Player projectile
+    - [x] Player projectile
     - [ ] Enemy projectile (only back row? timer?)
     - [ ] Collision
-        - [ ] With enemy
+        - [x] With enemy
         - [ ] With player
         - [ ] With cover
 - [ ] Game over screen
