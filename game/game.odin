@@ -3,26 +3,30 @@ package game
 import rl "vendor:raylib"
 import "core:fmt"
 import "core:math/rand"
-import "core:thread"
-import "core:time"
 
 TARGET_FPS  :: 240
 SCREEN_SIZE :: 600
 
 PLAYER_SPEED :: 200
 
-PROJECTILE_WIDTH  :: 4
-PROJECTILE_HEIGHT :: 10
+PROJECTILE_WIDTH        :: 4
+PROJECTILE_HEIGHT       :: 20
+PROJECTILE_SPEED_PLAYER :: 200
 
 NUM_STARS :: 60
 
 
-deltaSpeed: f32
-starCount: u8
+deltaPlayerSpeed: f32
+globalCount: u8
 
 centerTop: rl.Vector2 = {SCREEN_SIZE / 2, 0}
 centerBot: rl.Vector2 = {SCREEN_SIZE / 2, SCREEN_SIZE}
 
+// Dynamic array of player's spawned projectiles
+projectileList: [dynamic]Projectile
+
+
+// Entity stuff
 Entity :: struct {
   texture: rl.Texture2D,
   x: f32,
@@ -30,6 +34,8 @@ Entity :: struct {
   health: u8,
 }
 
+
+// Projectile stuff
 Projectile :: struct {
   x: f32,
   y: f32,
@@ -46,6 +52,22 @@ spawn_projectile :: proc(proj: Projectile) -> rl.Rectangle {
   }
 }
 
+update_projectile :: proc(proj: ^Projectile, enemy: Entity) -> (remove: bool = false) {
+  if proj.y < 0 {
+    remove = true
+  }
+
+  if rl.CheckCollisionRecs(get_bounding_box(proj), get_bounding_box(enemy)) {
+    remove = true
+  }
+
+  proj.y -= f32(proj.speed) * rl.GetFrameTime()
+
+  return // remove true|false
+}
+
+
+// Star stuff
 Star :: struct {
   x: f32,
   y: f32,
@@ -59,28 +81,46 @@ update_star :: proc(star: ^Star) {
     star.alpha = u8(rand.uint_range(16, 200))
   }
 
-  star.y += deltaSpeed * 1/2
-  if starCount % 16 == 0 do star.alpha -= 1
+  star.y += deltaPlayerSpeed * 1/2
+  if globalCount % 16 == 0 do star.alpha -= 1
 
-  if starCount == 64 {
-    starCount = 1
+  if globalCount == 64 {
+    globalCount = 1
   }
 }
 
-reset_game :: proc(player: ^Entity, stars: ^[NUM_STARS]Star) {
+
+
+//
+// Reset Game
+//
+reset_game :: proc(player: ^Entity, stars: ^[NUM_STARS]Star, proj: ^[dynamic]Projectile) {
+  // Reset player
   player.x = f32(SCREEN_SIZE/2 - player.texture.width/2)
   player.y = f32(SCREEN_SIZE - SCREEN_SIZE/6)
   player.health = 3
 
+  // Reset stars
   for &star in stars {
     star.x = f32(rand.uint_max(SCREEN_SIZE - 20))
     star.y = f32(rand.uint_range(0, SCREEN_SIZE))
     star.alpha = u8(rand.uint_range(16, 200))
   }
-  starCount = 1
+  globalCount = 1
+  
+  // Reset projectiles
+  clear(proj)
+  shrink(proj)
+  fmt.println("size of list:", len(proj))
+  fmt.println("cap of list: ", len(proj))
 }
+//
+//
+//
 
 main :: proc() {
+  defer delete(projectileList)
+
   // Window Initiation
   rl.InitWindow(SCREEN_SIZE, SCREEN_SIZE, "Space Invaders")
   defer rl.CloseWindow()
@@ -128,9 +168,10 @@ main :: proc() {
     star.y = f32(rand.uint_range(0, SCREEN_SIZE))
     star.alpha = u8(rand.uint_range(16, 200))
   }
-  starCount = 1
+  globalCount = 1
 
 
+  shootingDelay := 0
 
   // Game Loop
   for !rl.WindowShouldClose() {
@@ -139,25 +180,36 @@ main :: proc() {
     //
 
     // Frametime player speed
-    deltaSpeed = PLAYER_SPEED * rl.GetFrameTime()
+    deltaPlayerSpeed = PLAYER_SPEED * rl.GetFrameTime()
 
     if rl.IsKeyPressed(rl.KeyboardKey.R) {
-      reset_game(&player, &stars)
+      reset_game(&player, &stars, &projectileList)
     }
 
 
 
     // Player input
     if rl.IsKeyDown(rl.KeyboardKey.A) || rl.IsKeyDown(rl.KeyboardKey.LEFT) {
-      if player.x - deltaSpeed > 0 do player.x -= deltaSpeed
+      if player.x - deltaPlayerSpeed > 0 do player.x -= deltaPlayerSpeed
     }
     if rl.IsKeyDown(rl.KeyboardKey.D) || rl.IsKeyDown(rl.KeyboardKey.RIGHT) {
-      if player.x + f32(player.texture.width) + deltaSpeed < SCREEN_SIZE do player.x += deltaSpeed
-    }
-    if rl.IsKeyPressed(rl.KeyboardKey.SPACE) {
-      fmt.println("[shoot here]")
+      if player.x + f32(player.texture.width) + deltaPlayerSpeed < SCREEN_SIZE do player.x += deltaPlayerSpeed
     }
 
+    if rl.IsKeyPressed(rl.KeyboardKey.SPACE) && shootingDelay == 0 {
+      // fmt.println("[shoot here]")
+      inject_at(&projectileList, 0, Projectile {
+        x = player.x + f32(player.texture.width / 2) - 2,
+        y = player.y - PROJECTILE_HEIGHT - 2,
+        color = rl.SKYBLUE,
+        speed = PROJECTILE_SPEED_PLAYER,
+      })
+      // fmt.println("# of projectiles:", len(projectileList))
+      shootingDelay = 50 
+    }
+    if shootingDelay != 0 { 
+      shootingDelay -= 1 
+    }
 
 
     //
@@ -171,16 +223,26 @@ main :: proc() {
 
     // Draw stars
     for &star in stars {
-      rl.DrawRectangle(i32(star.x), i32(star.y), 2, 4, rl.Color{255, 255, 255, star.alpha}) 
+      rl.DrawRectangle(i32(star.x), i32(star.y), 2, 4, rl.Color{255, 255, 255, star.alpha})
       update_star(&star)
     }
-    starCount += 1
+    globalCount += 1
 
     // Draw player
     rl.DrawTexture(player.texture, i32(player.x), i32(player.y), rl.WHITE)
 
     // Draw enemy
     rl.DrawTexture(enemy1.texture, i32(enemy1.x), i32(enemy1.y), rl.WHITE)
+    // rl.DrawRectangleLinesEx(get_bounding_box(enemy1), 1, rl.BLUE)
+
+    // Draw projectiles
+    for &proj, index in projectileList {
+      rl.DrawRectangle(i32(proj.x), i32(proj.y), PROJECTILE_WIDTH, PROJECTILE_HEIGHT, proj.color)
+      if update_projectile(&proj, enemy1) { 
+        unordered_remove(&projectileList, index)
+      // fmt.println("# of projectiles:", len(projectileList))
+      }
+    }
 
     // Draw center line
     // rl.DrawLineEx(centerTop, centerBot, 2, rl.GREEN)
